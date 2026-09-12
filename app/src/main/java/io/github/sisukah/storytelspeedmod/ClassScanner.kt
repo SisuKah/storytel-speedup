@@ -43,19 +43,55 @@ object ClassScanner {
                 "could not read dex entries (hidden API?) — cannot auto-scan")
         }
         var tested = 0
+        var candidates = 0
+        // A class can LOOK like PlaybackParameters (a two-float geometry type with a constant of
+        // its own type would). Only one thing proves it: PlaybackParameters precomputes
+        // scaledUsPerMs = Math.round(speed * 1000f), so building it with speed 2.0 must leave an
+        // int field holding exactly 2000. Keep scanning past unverified look-alikes.
+        var fallback: Class<*>? = null
         for (name in names) {
             if (SKIP.any { name.startsWith(it) }) continue
-            // ':' appears in some synthetic entries; '[' would be an array descriptor
-            if (name.isEmpty() || name[0] == '[' ) continue
+            // '[' would be an array descriptor, never a plain class entry
+            if (name.isEmpty() || name[0] == '[') continue
             val c = try { Class.forName(name, false, cl) } catch (t: Throwable) { continue }
             tested++
-            if (matchesPlaybackParameters(c)) {
-                val ms = System.currentTimeMillis() - start
-                return Result(c, names.size, tested, ms, "matched ${c.name}")
+            if (!matchesPlaybackParameters(c)) continue
+            candidates++
+            if (verifyByScaledUsPerMs(c)) {
+                return Result(c, names.size, tested, System.currentTimeMillis() - start,
+                    "matched ${c.name} (VERIFIED: scaledUsPerMs==2000 at speed 2.0)")
+            }
+            if (fallback == null) fallback = c
+        }
+        val ms = System.currentTimeMillis() - start
+        return if (fallback != null) {
+            Result(fallback, names.size, tested, ms,
+                "matched ${fallback.name} (UNVERIFIED shape-only match, $candidates candidate(s); " +
+                    "if the speed does not change this is the wrong class)")
+        } else {
+            Result(null, names.size, tested, ms,
+                "no PlaybackParameters-shaped class among $tested tested (${names.size} enumerated)")
+        }
+    }
+
+    /**
+     * Builds the candidate with (speed=2.0, pitch=1.0) and looks for the precomputed
+     * Math.round(speed * 1000f) == 2000. Decisive, and immune to renaming.
+     */
+    internal fun verifyByScaledUsPerMs(c: Class<*>): Boolean = try {
+        val ctor = c.declaredConstructors.first { k ->
+            k.parameterTypes.size == 2 && k.parameterTypes.all { it == java.lang.Float.TYPE }
+        }
+        ctor.isAccessible = true
+        val instance = ctor.newInstance(2.0f, 1.0f)
+        c.declaredFields.any { f ->
+            !Modifier.isStatic(f.modifiers) && f.type == Integer.TYPE && run {
+                f.isAccessible = true
+                f.getInt(instance) == 2000
             }
         }
-        return Result(null, names.size, tested, System.currentTimeMillis() - start,
-            "no PlaybackParameters-shaped class among $tested tested (${names.size} enumerated)")
+    } catch (t: Throwable) {
+        false
     }
 
     internal fun matchesPlaybackParameters(c: Class<*>): Boolean {

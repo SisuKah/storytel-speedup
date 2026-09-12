@@ -133,7 +133,7 @@ class Media3Targets private constructor(
             if (pp == null && allowScan) {
                 // Media3 is not present by name (R8 renamed it): find it by structural fingerprint.
                 val r = ClassScanner.findPlaybackParameters(cl)
-                Diag.add("[SCAN] ${r.note} — enumerated ${r.enumerated}, tested ${r.tested}, ${r.ms}ms")
+                Diag.info("[SCAN] ${r.note} — enumerated ${r.enumerated}, tested ${r.tested}, ${r.ms}ms")
                 if (r.cls != null) {
                     pp = r.cls
                     notes += "PlaybackParameters found by structural scan: ${r.cls.name}"

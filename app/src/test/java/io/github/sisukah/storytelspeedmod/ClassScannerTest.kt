@@ -24,6 +24,13 @@ class ClassScannerTest {
     @Suppress("unused")
     class FakeScalar(@JvmField val value: Float)
 
+    // Right shape, but its int field is not Math.round(speed * 1000) -> must NOT verify.
+    @Suppress("unused")
+    class FakeWrongScale(@JvmField val a: Float, @JvmField val b: Float) {
+        @JvmField val count: Int = 7
+        fun scaled(s: Float): FakeWrongScale = FakeWrongScale(s, b)
+    }
+
     @Test fun matchesRealShape() {
         assertTrue(ClassScanner.matchesPlaybackParameters(FakePlaybackParameters::class.java))
     }
@@ -34,6 +41,17 @@ class ClassScannerTest {
 
     @Test fun rejectsSingleFloatClass() {
         assertFalse(ClassScanner.matchesPlaybackParameters(FakeScalar::class.java))
+    }
+
+    @Test fun verifiesRealShapeByScaledUsPerMs() {
+        // speed 2.0 -> Math.round(2.0 * 1000) == 2000 must be found in an int field
+        assertTrue(ClassScanner.verifyByScaledUsPerMs(FakePlaybackParameters::class.java))
+    }
+
+    @Test fun doesNotVerifyLookAlikeWithoutTheScaledField() {
+        // shape-compatible decoys must not pass verification
+        assertFalse(ClassScanner.verifyByScaledUsPerMs(FakeSize::class.java))
+        assertFalse(ClassScanner.verifyByScaledUsPerMs(FakeWrongScale::class.java))
     }
 
     @Test fun rejectsInterfacesAndPrimitiveHolders() {
