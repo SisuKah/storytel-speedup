@@ -56,8 +56,8 @@ object Media3Hooks {
             })
             SLog.i("hooked [entry${if (substituteHere) "+fallback-substitution" else ""}] ${Discovery.sig(setSpeed)}")
         } else if (funnel == null) {
-            SLog.w("neither the ExoPlayerImpl funnel nor BasePlayer.setPlaybackSpeed resolved: " +
-                "only hook_point=ctor can substitute speeds in this build")
+            SLog.w("no player funnel and no BasePlayer.setPlaybackSpeed resolved: the constructor " +
+                "hook will substitute automatically (this is the obfuscated-Media3 path)")
         }
 
         val ctor = t.ppCtor
@@ -71,7 +71,9 @@ object Media3Hooks {
                     }
                 }
             })
-            SLog.i("hooked [ctor] ${Discovery.sig(ctor)} (active only with hook_point=ctor)")
+            SLog.i("hooked [ctor] ${Discovery.sig(ctor)} " +
+                if (t.ctorOnly) "(ACTIVE: no player funnel resolved, ctor substitutes)"
+                else "(active with hook_point=ctor)")
         }
 
         // ---- discovery-only hooks (never modify anything) ------------------------------------
@@ -173,7 +175,9 @@ object Media3Hooks {
         val inSpeed = (param.args[0] as? Float) ?: return
         val pitch = (param.args[1] as? Float) ?: 1f
         val wantLog = cfg.discovery && cfg.discoveryCtor
-        val active = cfg.hookPoint == HookPoint.CTOR
+        // The ctor substitutes when explicitly selected (hook_point=ctor) OR automatically when no
+        // player-level entry point was resolved (the obfuscated-Media3 path).
+        val active = cfg.hookPoint == HookPoint.CTOR || t.ctorOnly
         if (!wantLog && !active) return
         val frames = frames(cfg)
         val decision = if (active) {
@@ -182,8 +186,10 @@ object Media3Hooks {
             SpeedPolicy.Decision(inSpeed, false, "hook_point=player; ctor logs only")
         }
         if (decision.changed) param.args[0] = decision.speed
+        val why = if (active && t.ctorOnly && cfg.hookPoint != HookPoint.CTOR) "auto-ctor; ${decision.reason}" else decision.reason
         val header = "[CTOR] ${Discovery.sig(c)} thread=${Thread.currentThread().name} " +
-            "in=${SpeedPolicy.fmt(inSpeed)}x pitch=${SpeedPolicy.fmt(pitch)} -> out=${SpeedPolicy.fmt(decision.speed)}x (${decision.reason})"
+            "in=${SpeedPolicy.fmt(inSpeed)}x pitch=${SpeedPolicy.fmt(pitch)} -> out=${SpeedPolicy.fmt(decision.speed)}x ($why)"
+        if (decision.changed || !SpeedPolicy.approxEqual(inSpeed, 1.0f)) Diag.add(header)
         if (wantLog) SLog.i(Discovery.block(header, frames.take(cfg.discoveryFrames)))
         else if (decision.changed) SLog.i(header)
     }

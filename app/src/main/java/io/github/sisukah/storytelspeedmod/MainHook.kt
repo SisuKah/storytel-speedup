@@ -26,12 +26,18 @@ class MainHook : IXposedHookLoadPackage {
 
     private val hooksInstalled = AtomicBoolean(false)
     private val receiverRegistered = AtomicBoolean(false)
+    private val scanStarted = AtomicBoolean(false)
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         SLog.i("LOADED: package=${lpparam.packageName} process=${lpparam.processName} pid=${Process.myPid()} " +
             "android=${Build.VERSION.SDK_INT} xposedApi=${XposedBridge.getXposedVersion()} " +
             "module=${BuildConfig.VERSION_NAME} device=${Build.MANUFACTURER} ${Build.MODEL}")
         XposedBridge.log("${SLog.TAG}: loaded in ${lpparam.packageName} (${lpparam.processName})")
+
+        // Allow the structural scan to read the class list on Android 9+ where non-SDK interfaces
+        // (dalvik.system.DexFile#entries) are otherwise blocked. No-op if the framework already
+        // exempted them.
+        HiddenApi.exempt()
 
         if (lpparam.packageName !in EXPECTED_PACKAGES) {
             SLog.w("package ${lpparam.packageName} is not in $EXPECTED_PACKAGES; continuing anyway " +
@@ -44,18 +50,19 @@ class MainHook : IXposedHookLoadPackage {
         SLog.i("effective config:\n${store.current.dump()}")
 
         hookApplicationOnCreate(store)
-        installHooks(lpparam.classLoader, store, phase = "handleLoadPackage")
+        // Fast, name-only attempt first (no scan) so an un-obfuscated build hooks immediately.
+        installHooks(lpparam.classLoader, store, phase = "handleLoadPackage", allowScan = false)
     }
 
-    private fun installHooks(cl: ClassLoader, store: ConfigStore, phase: String) {
+    private fun installHooks(cl: ClassLoader, store: ConfigStore, phase: String, allowScan: Boolean) {
         if (hooksInstalled.get()) return
         try {
-            val targets = Media3Targets.resolve(cl, store.current)
+            val targets = Media3Targets.resolve(cl, store.current, allowScan)
             targets.logSummary()
             Diag.resolution = targets.compact()
             if (!targets.usable) {
                 SLog.w("Media3 targets not usable at $phase; speed hooks NOT installed" +
-                    if (phase == "handleLoadPackage") " (will retry at Application.onCreate)" else "")
+                    if (!allowScan) " (will retry with a structural scan at Application.onCreate)" else "")
                 return
             }
             Media3Hooks.install(targets, store)
@@ -66,6 +73,17 @@ class MainHook : IXposedHookLoadPackage {
             Diag.resolution = "resolve/install FAILED at $phase: $t"
             SLog.e("installing hooks failed at $phase", t)
         }
+    }
+
+    /**
+     * The structural scan can enumerate tens of thousands of classes, so it must not run on the
+     * app's main thread. Run it once, in the background; hooking from another thread is fine.
+     */
+    private fun installHooksWithScanAsync(cl: ClassLoader, store: ConfigStore) {
+        if (hooksInstalled.get() || !scanStarted.compareAndSet(false, true)) return
+        Thread({
+            installHooks(cl, store, phase = "Application.onCreate (scan)", allowScan = true)
+        }, "StorytelSpeedMod-scan").apply { isDaemon = true }.start()
     }
 
     private fun hookApplicationOnCreate(store: ConfigStore) {
@@ -80,7 +98,9 @@ class MainHook : IXposedHookLoadPackage {
                             SLog.e("registering config receiver failed", t)
                         }
                     }
-                    installHooks(app.classLoader, store, phase = "Application.onCreate")
+                    // Try name-only again (cheap); if still not resolved, scan in the background.
+                    installHooks(app.classLoader, store, phase = "Application.onCreate", allowScan = false)
+                    installHooksWithScanAsync(app.classLoader, store)
                 }
             })
         } catch (t: Throwable) {

@@ -40,10 +40,18 @@ class Media3Targets private constructor(
     val notes: List<String>,
 ) {
 
-    /** True when we can read/construct PlaybackParameters and have at least one funnel. */
+    /**
+     * True when we can read/construct PlaybackParameters. That alone is enough to substitute at
+     * the constructor (which every speed change flows through), so a resolved player funnel is a
+     * bonus, not a requirement. When the funnel and setPlaybackSpeed are both missing (e.g. the
+     * player class is renamed and could not be found), the constructor hook substitutes on its own.
+     */
     val usable: Boolean
-        get() = ppClass != null && ppCtor != null && speedField != null && pitchField != null &&
-            (setPlaybackParameters != null || setPlaybackSpeed != null)
+        get() = ppClass != null && ppCtor != null && speedField != null && pitchField != null
+
+    /** No player-level entry point resolved: the constructor hook is the only substitution site. */
+    val ctorOnly: Boolean
+        get() = setPlaybackParameters == null && setPlaybackSpeed == null
 
     fun speedOf(pp: Any?): Float = if (pp == null) 1f else (speedField?.getFloat(pp) ?: 1f)
     fun pitchOf(pp: Any?): Float = if (pp == null) 1f else (pitchField?.getFloat(pp) ?: 1f)
@@ -117,11 +125,22 @@ class Media3Targets private constructor(
             "com.google.android.exoplayer2.ExoPlayerLibraryInfo",
         )
 
-        fun resolve(cl: ClassLoader, cfg: Config): Media3Targets {
+        fun resolve(cl: ClassLoader, cfg: Config, allowScan: Boolean = false): Media3Targets {
             val notes = ArrayList<String>()
 
             // ---- PlaybackParameters ---------------------------------------------------------
-            val pp = findClass(cl, cfg.raw(Keys.CLS_PLAYBACK_PARAMETERS), PP_CANDIDATES, notes)
+            var pp = findClass(cl, cfg.raw(Keys.CLS_PLAYBACK_PARAMETERS), PP_CANDIDATES, notes)
+            if (pp == null && allowScan) {
+                // Media3 is not present by name (R8 renamed it): find it by structural fingerprint.
+                val r = ClassScanner.findPlaybackParameters(cl)
+                Diag.add("[SCAN] ${r.note} — enumerated ${r.enumerated}, tested ${r.tested}, ${r.ms}ms")
+                if (r.cls != null) {
+                    pp = r.cls
+                    notes += "PlaybackParameters found by structural scan: ${r.cls.name}"
+                } else {
+                    notes += "structural scan did not find PlaybackParameters (${r.note})"
+                }
+            }
             var ppCtor: Constructor<*>? = null
             var speedField: Field? = null
             var pitchField: Field? = null

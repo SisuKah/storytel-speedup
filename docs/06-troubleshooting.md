@@ -39,7 +39,11 @@ Read the `Media3 target resolution:` block first.
 
 ```text
 PlaybackParameters: NOT FOUND
-└── Media3 renamed by R8 (Phase 2, Case B). Find the renamed classes via strings
+└── First the module now RETRIES automatically with a structural scan at app start (it finds
+    PlaybackParameters by shape, not by name, and substitutes at its constructor). Re-check the
+    diagnostics: after the retry, usable should become true and PlaybackParameters should show a
+    (renamed) class name. Only if the scan reports "could not read dex entries" or "no
+    PlaybackParameters-shaped class" do you fall back to finding the names via strings
     ("AndroidXMedia3/", "ExoPlayerImpl", 0.1f/8.0f clamp, Math.round(f*1000.0f)) and set
     cls_playback_parameters / cls_player_impl (+ cls_base_player), then force-stop Storytel.
     Also possible: Storytel does not use Media3/ExoPlayer at all (e.g. a native player or
