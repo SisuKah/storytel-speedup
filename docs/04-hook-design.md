@@ -132,7 +132,42 @@ Changes to `mode`, `target`, `remap_from`, `max_speed`, `hook_point`, `caller_fi
 `discovery*` keys apply **immediately**. The `cls_*`, `m_*`, `f_*` and `ui_*` keys are used when
 the process starts: change them, then `adb shell am force-stop grit.storytel.app` and reopen.
 
+### Storytel's custom-speed picker (extended in place)
+
+Storytel 26.35 was decompiled (JADX) to settle this. Its "Edit custom speed" control is a wheel
+picker fed by a list, and the whole speed path is:
+
+```text
+GetPlaybackSpeedOptions (use case):
+    predefined = generateSequence(1.0) { it + 0.25 }.takeWhile { it <= 2.0 }
+    custom     = generateSequence(0.5) { it + 0.1  }.takeWhile { it <= max }
+    max        = featureFlags.maximumPlaybackSpeed()   // Firebase Remote Config "maximum_playback_speed"
+                                                       // unset / <= 0  ->  2.0
+    -> PlaybackSpeedOptions(selectedSpeed, selectedMode, customSpeed, predefinedSpeeds, additionalSpeeds)
+PlaybackSpeedViewModel.setSpeed(f, mode, analytics):  if (f <= 0) return;  service.setSpeed(f)
+AudioService "CUSTOM_ACTION_PLAYBACK_SPEED":          f = extras.getFloat("EXTRA_PLAYBACK_SPEED"); store; PlaybackManager.setSpeed(f)
+PlaybackManager:                                      player.setPlaybackParameters(PlaybackParameters(f, 1.0))
+```
+
+There is **no clamp anywhere**: the only ceiling is the list the picker is offered, and its end is a
+server-side flag. `PickerHooks` raises that end to `max_speed` in two independent, name-free ways
+(Storytel's own class names are renamed per release, e.g. the same class is `cyh` in one build and
+`tmd` in another):
+
+| | Anchor that survives R8 | What is done |
+|---|---|---|
+| A | `com.storytel.playbackspeed.ui.viewmodel.PlaybackSpeedViewModel` keeps its name (Hilt generates classes referencing it) | from a constructed view model: injected use case → its dependency whose class has exactly **one** zero-arg `double` method (the flags object; verified unique in 26.35) → that method is hooked to return at least `max_speed`, only when called from that use case and only if its value looks like a speed |
+| B | `PlaybackSpeedOptions` is a data class with a `(float, Mode, float, List, List)` constructor where `Mode` has static members named `PREDEFINED` and `CUSTOM`, and `toString()` still starts with `PlaybackSpeedOptions(` | found by that shape (unique in 26.35), verified by that string, and the 5th argument is replaced with `0.5 … max_speed` in 0.1 steps (elements bit-identical to Storytel's own, so the saved custom speed still highlights) |
+
+Once either has fired, `picker_confirmed=true` is persisted and the **ladder stands down**: with a
+native 0.5 … 4.0 picker every value is a real choice, so nothing is remapped. Diagnostics:
+`picker:` (what installed), `[PICKER] custom speeds 0.50..2.00 -> 0.50..4.00 (36 entries)` when
+the sheet opens, `[PICKER] maximum_playback_speed 2.00 -> 4.00` if A fired. `picker=off` disables it.
+
 ### Storytel's custom-speed slider (extended in place)
+
+*(Written before the decompile showed the control is a wheel picker, not a slider. Kept because it
+is harmless and would apply if a build ever switches to a slider widget.)*
 
 Storytel's "Edit custom speed" slider runs 0.5 … 2.0 in 0.1 steps. A slider is a far better
 target than the preset buttons: it already produces arbitrary values, its label is computed from

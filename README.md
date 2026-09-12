@@ -7,13 +7,14 @@ Media3/ExoPlayer playback speed inside the app process. Personal use on your own
 It does **not** touch DRM, audio data, downloads, or network traffic. It changes one number
 (`PlaybackParameters.speed`) on its way into ExoPlayer, and keeps pitch correction as-is.
 
-Two things happen inside Storytel itself, nothing to open, nothing to restart:
+Everything happens inside Storytel itself, nothing to open, nothing to restart:
 
-- Storytel's **custom-speed slider** (0.5 … 2.0) is extended up to 4.0, with correct labels and
-  a correct time-remaining, because the slider already handles arbitrary values.
-- In **ladder mode** (default) the four fastest preset buttons play faster than they say
-  (1.25 -> 2.5x, 1.5 -> 3x, 1.75 -> 3.5x, 2 -> 4x). 1x and below are untouched. A value chosen on
-  the slider is never remapped.
+- Storytel's **"Edit custom speed" picker** (0.5 … 2.0) is extended up to 4.0 in 0.1 steps, with
+  Storytel's own labels, persistence and time-remaining, because the picker's ceiling is just a
+  server flag (`maximum_playback_speed`) that the module overrides from inside the app.
+- Until that has happened once, **ladder mode** makes the four fastest preset buttons play faster
+  than they say (1.25 -> 2.5x, 1.5 -> 3x, 1.75 -> 3.5x, 2 -> 4x). As soon as the picker is
+  extended, the ladder stands down and every value is a real choice.
 
 ## Working order (do not skip ahead)
 
@@ -35,6 +36,11 @@ Audio behaviour at high speeds (pitch, artifacts, CPU, limits) is covered at the
 ## What is confirmed vs. what you must identify
 
 **Confirmed (from primary sources, not guessed):**
+
+- Storytel 26.35 decompiled: its own feature packages keep real names (`com.storytel.playbackspeed…`),
+  while libraries (Media3, Compose, kotlin) are renamed per release. The custom-speed list is
+  `0.5, +0.1 … ≤ maximum_playback_speed` (a Firebase Remote Config flag, default 2.0) and there is
+  no clamp between the picker and `PlaybackParameters(f, 1.0)`. See docs/04-hook-design.md.
 
 - Storytel's package name is `grit.storytel.app` (Play Store listing). Confirm on your phone with
   `adb shell pm list packages | grep -i storytel`.

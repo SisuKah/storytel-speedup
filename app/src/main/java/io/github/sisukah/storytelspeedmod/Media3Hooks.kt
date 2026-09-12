@@ -138,6 +138,11 @@ object Media3Hooks {
      * Null when the slider is not involved.
      */
     private fun sliderDecision(inSpeed: Float, cfg: Config): SpeedPolicy.Decision? {
+        // With Storytel's own picker extended to max_speed, every speed is a real choice: the
+        // ladder (a workaround for a 2.0 ceiling) must not remap any of them.
+        if (PickerHooks.extended && cfg.mode == Mode.LADDER) {
+            return SpeedPolicy.Decision(inSpeed, false, "native picker extended; ladder stands down")
+        }
         if (!cfg.sliderEnabled) return null
         SliderHooks.clampBypassFor(inSpeed, cfg)?.let {
             return SpeedPolicy.Decision(it, true, "slider chose ${SpeedPolicy.fmt(it)}, Storytel clamped it to ${SpeedPolicy.fmt(inSpeed)}")

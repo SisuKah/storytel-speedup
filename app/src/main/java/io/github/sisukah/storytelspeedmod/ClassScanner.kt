@@ -35,6 +35,23 @@ object ClassScanner {
     /** Result of a scan, for diagnostics. */
     data class Result(val cls: Class<*>?, val enumerated: Int, val tested: Int, val ms: Long, val note: String)
 
+    /** Generic scan: the first loadable class (outside SKIP packages) for which [predicate] holds. */
+    fun findFirst(cl: ClassLoader, what: String, predicate: (Class<*>) -> Boolean): Result {
+        val start = System.currentTimeMillis()
+        val names = classNames(cl)
+        if (names.isEmpty()) return Result(null, 0, 0, 0, "could not read dex entries")
+        var tested = 0
+        for (name in names) {
+            if (SKIP.any { name.startsWith(it) }) continue
+            if (name.isEmpty() || name[0] == '[') continue
+            val c = try { Class.forName(name, false, cl) } catch (t: Throwable) { continue }
+            tested++
+            val ok = try { predicate(c) } catch (t: Throwable) { false }
+            if (ok) return Result(c, names.size, tested, System.currentTimeMillis() - start, "matched ${c.name}")
+        }
+        return Result(null, names.size, tested, System.currentTimeMillis() - start, "no $what among $tested classes")
+    }
+
     fun findPlaybackParameters(cl: ClassLoader): Result {
         val start = System.currentTimeMillis()
         val names = classNames(cl)

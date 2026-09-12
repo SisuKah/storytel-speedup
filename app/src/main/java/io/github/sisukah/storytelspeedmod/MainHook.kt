@@ -28,6 +28,8 @@ class MainHook : IXposedHookLoadPackage {
     private val receiverRegistered = AtomicBoolean(false)
     private val scanStarted = AtomicBoolean(false)
     private val sliderInstalled = AtomicBoolean(false)
+    private val pickerInstalled = AtomicBoolean(false)
+    private val pickerScanStarted = AtomicBoolean(false)
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         SLog.i("LOADED: package=${lpparam.packageName} process=${lpparam.processName} pid=${Process.myPid()} " +
@@ -60,6 +62,15 @@ class MainHook : IXposedHookLoadPackage {
             } catch (t: Throwable) {
                 Diag.slider = "install FAILED: $t"
                 SLog.e("installing slider hooks failed", t)
+            }
+        }
+        // Storytel's custom-speed picker: the fast, name-based part now; the class scan at onCreate.
+        if (pickerInstalled.compareAndSet(false, true)) {
+            try {
+                PickerHooks.install(lpparam.classLoader, store)
+            } catch (t: Throwable) {
+                Diag.picker = "install FAILED: $t"
+                SLog.e("installing picker hooks failed", t)
             }
         }
     }
@@ -111,6 +122,10 @@ class MainHook : IXposedHookLoadPackage {
                     // Try name-only again (cheap); if still not resolved, scan in the background.
                     installHooks(app.classLoader, store, phase = "Application.onCreate", allowScan = false)
                     installHooksWithScanAsync(app.classLoader, store)
+                    if (pickerScanStarted.compareAndSet(false, true)) {
+                        Thread({ PickerHooks.installOptionsHook(app.classLoader, store) }, "StorytelSpeedMod-picker")
+                            .apply { isDaemon = true }.start()
+                    }
                 }
             })
         } catch (t: Throwable) {

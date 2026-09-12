@@ -28,6 +28,10 @@ object Keys {
     const val SLIDER_SEEKBAR_ID = "slider_seekbar_id"   // force this view id name as the speed SeekBar
     const val SLIDER_SEEKBAR_MAX = "slider_seekbar_max" // the max a speed SeekBar has in Storytel (15 = 0.1 steps)
 
+    // --- Storytel's custom-speed wheel picker ------------------------------------------------
+    const val PICKER = "picker"                     // on | off: extend the 0.5..2.0 picker up to max_speed
+    const val PICKER_CONFIRMED = "picker_confirmed" // set by the module once the picker was extended
+
     // --- discovery / debug -------------------------------------------------------------------
     const val DISCOVERY = "discovery"
     const val DISCOVERY_FRAMES = "discovery_frames"
@@ -57,7 +61,7 @@ object Keys {
 
     val ALL: List<String> = listOf(
         MODE, LADDER, TARGET, REMAP_FROM, MAX_SPEED, HOOK_POINT, CALLER_FILTER, CONFIG_VERSION,
-        SLIDER, SLIDER_SEEKBAR, SLIDER_SEEKBAR_ID, SLIDER_SEEKBAR_MAX,
+        SLIDER, SLIDER_SEEKBAR, SLIDER_SEEKBAR_ID, SLIDER_SEEKBAR_MAX, PICKER, PICKER_CONFIRMED,
         DISCOVERY, DISCOVERY_FRAMES, DISCOVERY_CTOR, DISCOVERY_GETTERS,
     ) + OVERRIDE_KEYS
 }
@@ -120,6 +124,8 @@ class Config(private val values: Map<String, String>) {
     val sliderSeekBar: Boolean get() = bool(Keys.SLIDER_SEEKBAR, true)
     val sliderSeekBarId: String? get() = raw(Keys.SLIDER_SEEKBAR_ID)
     val sliderSeekBarMax: Int get() = int(Keys.SLIDER_SEEKBAR_MAX, 15)
+    val pickerEnabled: Boolean get() = bool(Keys.PICKER, true)
+    val pickerConfirmed: Boolean get() = bool(Keys.PICKER_CONFIRMED, false)
     val discovery: Boolean get() = bool(Keys.DISCOVERY, false)
     val discoveryFrames: Int get() = int(Keys.DISCOVERY_FRAMES, 10).coerceIn(0, 40)
     val discoveryCtor: Boolean get() = bool(Keys.DISCOVERY_CTOR, false)
@@ -167,6 +173,8 @@ class Config(private val values: Map<String, String>) {
         append("slider_seekbar=").append(sliderSeekBar).append('\n')
         append("slider_seekbar_id=").append(sliderSeekBarId ?: "").append('\n')
         append("slider_seekbar_max=").append(sliderSeekBarMax).append('\n')
+        append("picker=").append(pickerEnabled).append('\n')
+        append("picker_confirmed=").append(pickerConfirmed).append('\n')
         append("discovery=").append(discovery).append('\n')
         append("discovery_frames=").append(discoveryFrames).append('\n')
         append("discovery_ctor=").append(discoveryCtor).append('\n')
@@ -211,6 +219,8 @@ class Config(private val values: Map<String, String>) {
             Keys.SLIDER to "true",
             Keys.SLIDER_SEEKBAR to "true",
             Keys.SLIDER_SEEKBAR_MAX to "15",
+            Keys.PICKER to "true",
+            Keys.PICKER_CONFIRMED to "false",
             Keys.DISCOVERY to "false",
             Keys.DISCOVERY_FRAMES to "10",
             Keys.DISCOVERY_CTOR to "false",

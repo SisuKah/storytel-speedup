@@ -20,6 +20,10 @@ object Diag {
     @Volatile
     var resolution: String = "(hooks not installed yet — is the module loaded? see the pid line above)"
 
+    /** What PickerHooks managed to hook. */
+    @Volatile
+    var picker: String = "(picker hooks not installed)"
+
     /** What SliderHooks managed to hook; set once at install. */
     @Volatile
     var slider: String = "(slider hooks not installed)"
@@ -63,6 +67,7 @@ object Diag {
     fun snapshot(maxEvents: Int = 8): String = buildString {
         append("--- diagnostics ---\n")
         append(resolution).append('\n')
+        append("picker: ").append(picker).append('\n')
         append("slider: ").append(slider).append('\n')
         infos.forEach { append(it).append('\n') }
         if (observed.isNotEmpty()) {
