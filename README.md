@@ -7,9 +7,13 @@ Media3/ExoPlayer playback speed inside the app process. Personal use on your own
 It does **not** touch DRM, audio data, downloads, or network traffic. It changes one number
 (`PlaybackParameters.speed`) on its way into ExoPlayer, and keeps pitch correction as-is.
 
-By default it runs in **ladder mode**: Storytel's four fastest buttons play faster than they say
-(1.25 -> 2.5x, 1.5 -> 3x, 1.75 -> 3.5x, 2 -> 4x), so every high speed is one tap away inside
-Storytel itself. Nothing to open, nothing to restart. 1x and below are untouched.
+Two things happen inside Storytel itself, nothing to open, nothing to restart:
+
+- Storytel's **custom-speed slider** (0.5 … 2.0) is extended up to 4.0, with correct labels and
+  a correct time-remaining, because the slider already handles arbitrary values.
+- In **ladder mode** (default) the four fastest preset buttons play faster than they say
+  (1.25 -> 2.5x, 1.5 -> 3x, 1.75 -> 3.5x, 2 -> 4x). 1x and below are untouched. A value chosen on
+  the slider is never remapped.
 
 ## Working order (do not skip ahead)
 

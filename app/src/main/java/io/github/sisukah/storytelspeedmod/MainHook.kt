@@ -27,6 +27,7 @@ class MainHook : IXposedHookLoadPackage {
     private val hooksInstalled = AtomicBoolean(false)
     private val receiverRegistered = AtomicBoolean(false)
     private val scanStarted = AtomicBoolean(false)
+    private val sliderInstalled = AtomicBoolean(false)
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         SLog.i("LOADED: package=${lpparam.packageName} process=${lpparam.processName} pid=${Process.myPid()} " +
@@ -52,6 +53,15 @@ class MainHook : IXposedHookLoadPackage {
         hookApplicationOnCreate(store)
         // Fast, name-only attempt first (no scan) so an un-obfuscated build hooks immediately.
         installHooks(lpparam.classLoader, store, phase = "handleLoadPackage", allowScan = false)
+        // Independent of the Media3 resolution: the slider hooks target framework/library widgets.
+        if (sliderInstalled.compareAndSet(false, true)) {
+            try {
+                SliderHooks.install(lpparam.classLoader, store)
+            } catch (t: Throwable) {
+                Diag.slider = "install FAILED: $t"
+                SLog.e("installing slider hooks failed", t)
+            }
+        }
     }
 
     private fun installHooks(cl: ClassLoader, store: ConfigStore, phase: String, allowScan: Boolean) {

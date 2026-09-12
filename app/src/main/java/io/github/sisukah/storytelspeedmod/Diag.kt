@@ -20,6 +20,10 @@ object Diag {
     @Volatile
     var resolution: String = "(hooks not installed yet — is the module loaded? see the pid line above)"
 
+    /** What SliderHooks managed to hook; set once at install. */
+    @Volatile
+    var slider: String = "(slider hooks not installed)"
+
     private const val MAX = 25
     private const val MAX_INFO = 6
     private val events = ArrayDeque<String>()
@@ -59,6 +63,7 @@ object Diag {
     fun snapshot(maxEvents: Int = 8): String = buildString {
         append("--- diagnostics ---\n")
         append(resolution).append('\n')
+        append("slider: ").append(slider).append('\n')
         infos.forEach { append(it).append('\n') }
         if (observed.isNotEmpty()) {
             append("speeds Storytel asked for: ")

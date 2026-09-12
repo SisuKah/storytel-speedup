@@ -38,6 +38,8 @@ class ConfigActivity : Activity() {
     private lateinit var ladderEdit: EditText
     private lateinit var targetGroup: RadioGroup
     private lateinit var customTarget: EditText
+    private lateinit var sliderBox: CheckBox
+    private lateinit var topGroup: RadioGroup
     private lateinit var discoveryBox: CheckBox
     private lateinit var ctorBox: CheckBox
     private lateinit var advancedEdit: EditText
@@ -59,15 +61,27 @@ class ConfigActivity : Activity() {
         }
 
         root.addView(note(
-            "Ladder mode (default): pick the speed inside Storytel. Its four fastest buttons play " +
-                "faster than they say. Changes apply the moment you tap a speed in Storytel — no restart."))
+            "Everything is chosen inside Storytel. Its custom-speed slider is extended past 2x, and " +
+                "in ladder mode its four fastest buttons play faster than they say. Changes apply the " +
+                "moment you move the slider or tap a speed — no restart."))
+
+        root.addView(label("Storytel's custom-speed slider"))
+        sliderBox = CheckBox(this).apply { text = "Extend the slider (0.5–2.0) up to the top speed"; isChecked = true }
+        root.addView(sliderBox)
+        root.addView(label("Top speed  (slider end, and the cap for everything)"))
+        topGroup = RadioGroup(this).apply { orientation = LinearLayout.HORIZONTAL }
+        TOPS.forEachIndexed { i, v ->
+            topGroup.addView(RadioButton(this).apply { id = ID_TOP_BASE + i; text = "${v}x" })
+        }
+        topGroup.check(ID_TOP_BASE + TOPS.lastIndex)
+        root.addView(topGroup)
 
         root.addView(label("Mode"))
         modeGroup = RadioGroup(this)
         modeGroup.addView(RadioButton(this).apply { id = ID_MODE_LADDER; text = "Ladder — Storytel's buttons become fast speeds (recommended)" })
         modeGroup.addView(RadioButton(this).apply { id = ID_MODE_REMAP; text = "Remap only 2x to one target speed" })
         modeGroup.addView(RadioButton(this).apply { id = ID_MODE_FORCE; text = "Force one target speed for everything" })
-        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_OFF; text = "Off (no speed is changed)" })
+        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_OFF; text = "No button remapping (slider only)" })
         modeGroup.check(ID_MODE_LADDER)
         root.addView(modeGroup)
 
@@ -167,10 +181,13 @@ class ConfigActivity : Activity() {
             append(Keys.TARGET).append('=').append(target).append('\n')
             append(Keys.DISCOVERY).append('=').append(discoveryBox.isChecked).append('\n')
             append(Keys.HOOK_POINT).append('=').append(if (ctorBox.isChecked) HookPoint.CTOR.key else HookPoint.PLAYER.key).append('\n')
-            // Raise the cap to fit what was actually typed, so a 5x rung is not silently clamped
-            // to 4x. Written before the Advanced box so an explicit max_speed there still wins.
+            append(Keys.SLIDER).append('=').append(sliderBox.isChecked).append('\n')
+            // max_speed is both the slider's new end and the cap for every rung/target. Fit it to
+            // what was chosen so nothing is silently clamped; an explicit max_speed in the
+            // Advanced box (appended after this) still wins.
+            val top = TOPS.getOrElse(topGroup.checkedRadioButtonId - ID_TOP_BASE) { 4.0f }
             val highestTo = Config.parseLadder(ladder).maxOfOrNull { it.to } ?: 0f
-            val cap = minOf(SpeedPolicy.MEDIA3_MAX_SPEED, maxOf(4.0f, highestTo, target))
+            val cap = minOf(SpeedPolicy.MEDIA3_MAX_SPEED, maxOf(top, highestTo, target))
             append(Keys.MAX_SPEED).append('=').append(cap).append('\n')
             append(advancedEdit.text.toString())
         }
@@ -203,6 +220,8 @@ class ConfigActivity : Activity() {
             .putString("pkg", pkgEdit.text.toString())
             .putInt("mode", modeGroup.checkedRadioButtonId)
             .putString("ladder", ladderEdit.text.toString())
+            .putBoolean("slider", sliderBox.isChecked)
+            .putInt("top", topGroup.checkedRadioButtonId)
             .putInt("target", targetGroup.checkedRadioButtonId)
             .putString("custom", customTarget.text.toString())
             .putBoolean("discovery", discoveryBox.isChecked)
@@ -219,6 +238,8 @@ class ConfigActivity : Activity() {
         val freshPrefs = prefs.getInt("ui_version", 1) >= UI_PREFS_VERSION
         modeGroup.check(if (freshPrefs) prefs.getInt("mode", ID_MODE_LADDER) else ID_MODE_LADDER)
         ladderEdit.setText(prefs.getString("ladder", Config.DEFAULT_LADDER))
+        sliderBox.isChecked = prefs.getBoolean("slider", true)
+        topGroup.check(prefs.getInt("top", ID_TOP_BASE + TOPS.lastIndex))
         targetGroup.check(prefs.getInt("target", ID_TARGET_BASE + 1))
         customTarget.setText(prefs.getString("custom", ""))
         discoveryBox.isChecked = prefs.getBoolean("discovery", false)
@@ -246,6 +267,7 @@ class ConfigActivity : Activity() {
         /** Bumped when a stored UI selection would mean something different in this build. */
         const val UI_PREFS_VERSION = 2
         val TARGETS = listOf(2.5f, 3.0f, 3.5f, 4.0f)
+        val TOPS = listOf(2.5f, 3.0f, 3.5f, 4.0f)
 
         /**
          * One-tap ladders, gentle to fastest. Every output is above Storytel's own 2.0 maximum on
@@ -263,5 +285,6 @@ class ConfigActivity : Activity() {
         const val ID_MODE_FORCE = 1002
         const val ID_MODE_OFF = 1003
         const val ID_TARGET_BASE = 2000
+        const val ID_TOP_BASE = 3000
     }
 }

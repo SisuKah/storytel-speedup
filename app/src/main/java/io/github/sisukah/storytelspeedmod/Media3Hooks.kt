@@ -130,6 +130,24 @@ object Media3Hooks {
     private fun callerOk(cfg: Config, frames: List<String>): Boolean =
         cfg.callerFilter.isEmpty() || frames.any { it.contains(cfg.callerFilter) }
 
+    /**
+     * Storytel's own slider takes precedence over every mode:
+     *  - if the user chose a speed beyond 2.0 on it and Storytel clamped that back, restore it;
+     *  - if the value IS what the user just chose on the slider, take it as is (no rung applies,
+     *    so sliding to exactly 2.0 plays 2.0 while the 2x button still plays its rung).
+     * Null when the slider is not involved.
+     */
+    private fun sliderDecision(inSpeed: Float, cfg: Config): SpeedPolicy.Decision? {
+        if (!cfg.sliderEnabled) return null
+        SliderHooks.clampBypassFor(inSpeed, cfg)?.let {
+            return SpeedPolicy.Decision(it, true, "slider chose ${SpeedPolicy.fmt(it)}, Storytel clamped it to ${SpeedPolicy.fmt(inSpeed)}")
+        }
+        if (SliderHooks.cameFromSlider(inSpeed)) {
+            return SpeedPolicy.Decision(inSpeed, false, "chosen on Storytel's slider, taken as is")
+        }
+        return null
+    }
+
     private fun onSetPlaybackParameters(param: XC_MethodHook.MethodHookParam, m: Member, t: Media3Targets, store: ConfigStore) {
         val cfg = store.current
         val pp = param.args[0] ?: return   // null means PlaybackParameters.DEFAULT inside Media3; leave it
@@ -137,7 +155,7 @@ object Media3Hooks {
         val inPitch = t.pitchOf(pp)
         val frames = frames(cfg)
         val decision = if (cfg.hookPoint == HookPoint.PLAYER) {
-            SpeedPolicy.decide(inSpeed, cfg, callerOk(cfg, frames))
+            sliderDecision(inSpeed, cfg) ?: SpeedPolicy.decide(inSpeed, cfg, callerOk(cfg, frames))
         } else {
             SpeedPolicy.Decision(inSpeed, false, "hook_point=ctor substitutes in the constructor")
         }
@@ -157,7 +175,7 @@ object Media3Hooks {
         val inSpeed = (param.args[0] as? Float) ?: return
         val frames = frames(cfg)
         val decision = if (substituteHere && cfg.hookPoint == HookPoint.PLAYER) {
-            SpeedPolicy.decide(inSpeed, cfg, callerOk(cfg, frames))
+            sliderDecision(inSpeed, cfg) ?: SpeedPolicy.decide(inSpeed, cfg, callerOk(cfg, frames))
         } else {
             SpeedPolicy.Decision(inSpeed, false, "entry point; substitution happens downstream")
         }
@@ -182,13 +200,14 @@ object Media3Hooks {
         val active = cfg.hookPoint == HookPoint.CTOR || t.ctorOnly
         if (!wantLog && !active) return
         val frames = frames(cfg)
-        val decision = if (active) {
-            SpeedPolicy.decide(inSpeed, cfg, callerOk(cfg, frames))
-        } else {
-            SpeedPolicy.Decision(inSpeed, false, "hook_point=player; ctor logs only")
+        val fromSlider = if (active) sliderDecision(inSpeed, cfg) else null
+        val decision = when {
+            fromSlider != null -> fromSlider
+            active -> SpeedPolicy.decide(inSpeed, cfg, callerOk(cfg, frames))
+            else -> SpeedPolicy.Decision(inSpeed, false, "hook_point=player; ctor logs only")
         }
         if (decision.changed) param.args[0] = decision.speed
-        val why = if (active && t.ctorOnly && cfg.hookPoint != HookPoint.CTOR) "auto-ctor; ${decision.reason}" else decision.reason
+        val why = if (fromSlider == null && active && t.ctorOnly && cfg.hookPoint != HookPoint.CTOR) "auto-ctor; ${decision.reason}" else decision.reason
         val header = "[CTOR] ${Discovery.sig(c)} thread=${Thread.currentThread().name} " +
             "in=${SpeedPolicy.fmt(inSpeed)}x pitch=${SpeedPolicy.fmt(pitch)} -> out=${SpeedPolicy.fmt(decision.speed)}x ($why)"
         if (decision.changed || !SpeedPolicy.approxEqual(inSpeed, 1.0f)) Diag.add(header)

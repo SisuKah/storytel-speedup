@@ -132,6 +132,37 @@ Changes to `mode`, `target`, `remap_from`, `max_speed`, `hook_point`, `caller_fi
 `discovery*` keys apply **immediately**. The `cls_*`, `m_*`, `f_*` and `ui_*` keys are used when
 the process starts: change them, then `adb shell am force-stop grit.storytel.app` and reopen.
 
+### Storytel's custom-speed slider (extended in place)
+
+Storytel's "Edit custom speed" slider runs 0.5 … 2.0 in 0.1 steps. A slider is a far better
+target than the preset buttons: it already produces arbitrary values, its label is computed from
+the value, and Storytel's "time remaining" is computed from the same number, so an extended slider
+shows and plays 2.5x as 2.5x. Extending it means raising one bound, not inventing UI entries.
+
+Storytel's own code is renamed, so the slider is reached through whichever widget draws it. Each
+has a handle R8 cannot remove (`slider=on`, default; `max_speed` is the new end):
+
+| Widget | How it is found | How it is extended | How the chosen value is captured |
+|---|---|---|---|
+| `android.widget.SeekBar` (framework) | always, by name; the speed one by a view id containing "speed" or by `max == slider_seekbar_max` (15) | `ProgressBar.setMax` rewritten so the same 0.1 step reaches `max_speed` | `onProgressChanged` is a framework interface method, so its name survives R8 |
+| `com.google.android.material.slider.Slider` | by class name (kept when used from layout XML); range read through `getValueFrom/To` (setter/getter names are kept by the default R8 config) | `setValueTo(max_speed)` snapped to the step grid (Material throws at draw time otherwise) | its change listener by name or by shape, else `getValue()` while it is on screen |
+| Compose `SliderKt.Slider` (material3 / material) | by class name, if the build kept it | the `valueRange` argument is rebuilt from its own class and `steps` scaled to keep the increment | `onValueChange` (always the second argument) is wrapped in a Proxy |
+
+Two rules make it safe with everything else:
+
+- **Slider intent wins.** If the user chose 2.5 on the slider and Storytel clamped it to 2.0
+  before the player, the constructor hook restores 2.5 (`[CTOR] … slider chose 2.50, Storytel
+  clamped it to 2.00`). A value that *is* what the slider chose is taken as is, so sliding to
+  exactly 2.0 plays 2.0 while the 2x button still plays its ladder rung.
+- **A SeekBar whose app code indexes a table by position** cannot go past the table. The first
+  time that throws, the exception is swallowed, the SeekBar is marked, and from then on the app's
+  code sees at most the original max while the player still gets the real speed.
+
+Diagnostics: `slider:` in the reply says which widget hooks installed; opening the slider produces
+`[SLIDER] …` (what was found), `[SLIDER-EXTEND] …` (what was changed), and dragging past 2.0
+produces `[SLIDER-MOVE] … chose 2.50x` followed by the `[CTOR]` line that shows what the player
+received. `slider=off` disables all of it; `slider_seekbar=off` disables only the SeekBar part.
+
 ### Modes
 
 **`mode=ladder` (default).** Each of Storytel's own buttons maps to a faster effective speed, so the
