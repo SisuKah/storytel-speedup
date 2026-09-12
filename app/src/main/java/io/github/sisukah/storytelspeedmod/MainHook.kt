@@ -52,6 +52,7 @@ class MainHook : IXposedHookLoadPackage {
         try {
             val targets = Media3Targets.resolve(cl, store.current)
             targets.logSummary()
+            Diag.resolution = targets.compact()
             if (!targets.usable) {
                 SLog.w("Media3 targets not usable at $phase; speed hooks NOT installed" +
                     if (phase == "handleLoadPackage") " (will retry at Application.onCreate)" else "")
@@ -62,6 +63,7 @@ class MainHook : IXposedHookLoadPackage {
             hooksInstalled.set(true)
             SLog.i("hooks installed at $phase")
         } catch (t: Throwable) {
+            Diag.resolution = "resolve/install FAILED at $phase: $t"
             SLog.e("installing hooks failed at $phase", t)
         }
     }

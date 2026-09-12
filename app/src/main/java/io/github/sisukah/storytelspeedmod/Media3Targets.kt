@@ -59,6 +59,18 @@ class Media3Targets private constructor(
         else -> arg.toString()
     }
 
+    /** Short, human-readable summary for the in-app diagnostics reply (no adb needed). */
+    fun compact(): String = buildString {
+        append("media3=").append(media3Version ?: "unknown").append("  usable=").append(usable).append('\n')
+        append("PlaybackParameters=").append(ppClass?.name ?: "NOT FOUND").append('\n')
+        append("ExoPlayerImpl=").append(playerImplClass?.name ?: "NOT FOUND").append('\n')
+        append("funnel(setPlaybackParameters)=").append(setPlaybackParameters?.name ?: "NOT FOUND").append('\n')
+        append("setPlaybackSpeed=").append(setPlaybackSpeed?.name ?: "NOT FOUND")
+        if (notes.isNotEmpty()) {
+            append("\nnotes: ").append(notes.joinToString(" | "))
+        }
+    }
+
     fun logSummary() {
         val sb = StringBuilder("Media3 target resolution:\n")
         sb.append("  media3 version      : ").append(media3Version ?: "unknown (MediaLibraryInfo not found by name)").append('\n')

@@ -80,10 +80,10 @@ object Media3Hooks {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val n = playerCount.incrementAndGet()
                     val cfg = store.current
+                    val header = "[PLAYER-CREATED] ${impl.name} ${Discovery.id(param.thisObject)} (#$n in this process) thread=${Thread.currentThread().name}"
+                    Diag.add(header)
                     if (!cfg.discovery) return
-                    SLog.i(Discovery.block(
-                        "[PLAYER-CREATED] ${impl.name} ${Discovery.id(param.thisObject)} (#$n in this process) thread=${Thread.currentThread().name}",
-                        Discovery.callerFrames(cfg.discoveryFrames)))
+                    SLog.i(Discovery.block(header, Discovery.callerFrames(cfg.discoveryFrames)))
                 }
             })
         }
@@ -104,11 +104,11 @@ object Media3Hooks {
             XposedBridge.hookMethod(m, object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val cfg = store.current
+                    val header = "[ENTRY] ${Discovery.sig(m)} this=${param.thisObject?.javaClass?.name} ${Discovery.id(param.thisObject)} " +
+                        "thread=${Thread.currentThread().name} arg=${t.describe(param.args.getOrNull(0))}"
+                    Diag.add(header)
                     if (!cfg.discovery) return
-                    SLog.i(Discovery.block(
-                        "[ENTRY] ${Discovery.sig(m)} this=${param.thisObject?.javaClass?.name} ${Discovery.id(param.thisObject)} " +
-                            "thread=${Thread.currentThread().name} arg=${t.describe(param.args.getOrNull(0))}",
-                        Discovery.callerFrames(cfg.discoveryFrames)))
+                    SLog.i(Discovery.block(header, Discovery.callerFrames(cfg.discoveryFrames)))
                 }
             })
         }
@@ -145,6 +145,7 @@ object Media3Hooks {
         val header = "[SET] ${Discovery.sig(m)} player=${Discovery.id(param.thisObject)} thread=${Thread.currentThread().name} " +
             "in=${SpeedPolicy.fmt(inSpeed)}x pitch=${SpeedPolicy.fmt(inPitch)} -> out=${SpeedPolicy.fmt(decision.speed)}x " +
             "(${decision.reason}; mode=${cfg.mode.key} hook_point=${cfg.hookPoint.key})"
+        Diag.add(header)
         if (cfg.discovery) SLog.i(Discovery.block(header, frames.take(cfg.discoveryFrames)))
         else if (decision.changed) SLog.i(header)
     }
@@ -161,6 +162,7 @@ object Media3Hooks {
         if (decision.changed) param.args[0] = decision.speed
         val header = "[ENTRY] ${Discovery.sig(m)} this=${param.thisObject?.javaClass?.name} ${Discovery.id(param.thisObject)} " +
             "thread=${Thread.currentThread().name} in=${SpeedPolicy.fmt(inSpeed)}x -> out=${SpeedPolicy.fmt(decision.speed)}x (${decision.reason})"
+        Diag.add(header)
         if (cfg.discovery) SLog.i(Discovery.block(header, frames.take(cfg.discoveryFrames)))
         else if (decision.changed) SLog.i(header)
     }

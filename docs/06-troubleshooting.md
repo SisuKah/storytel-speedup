@@ -155,3 +155,24 @@ The UI (after Option C) offers 4x, but [SET] shows in=2.00x
   not call `super.onCreate()` (rare) → paste the log; the registration would move to an Activity hook.
 - Android 14 defers broadcasts to *cached* apps; bring Storytel to the foreground.
 - Check the package: `-p grit.storytel.app` must match `pm list packages`.
+
+---
+
+## Reading diagnostics without adb (in-app)
+
+The module reports its state through the config broadcast reply, which is what the
+*Storytel Speed Mod* app shows under "Reply from Storytel process". No adb needed:
+
+1. Open Storytel (patched) and start any audiobook.
+2. Change the speed to 2x (and try 1.5x, 2x again).
+3. Open *Storytel Speed Mod* and press **Show current**.
+
+The reply ends with a `--- diagnostics ---` block:
+
+- `media3=… usable=true/false` and the `PlaybackParameters=/ExoPlayerImpl=/funnel=` lines say
+  whether the hook attached. `usable=false` or `NOT FOUND` means Storytel's build renamed Media3
+  (Phase 2, Case B) or does not use ExoPlayer — the hook never ran.
+- `events seen: N` with `[SET]/[ENTRY]/[PLAYER-CREATED]` lines shows what the hook saw when you
+  changed speed. `[SET] … in=2.00x -> out=4.00x` means it is working. `events seen: 0` after you
+  changed speed means Storytel is not routing through the hooked player (different player, a clamp
+  before it, or a separate playback process — each `pid=…` block in the reply is one process).

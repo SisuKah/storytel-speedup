@@ -28,6 +28,7 @@ class ConfigReceiver(private val store: ConfigStore) : BroadcastReceiver() {
         try {
             if (intent.getBooleanExtra(EXTRA_RESET, false)) {
                 store.reset()
+                Diag.clear()
                 SLog.i("config reset to defaults")
             }
             val set = intent.getStringExtra(EXTRA_SET)
@@ -38,8 +39,13 @@ class ConfigReceiver(private val store: ConfigStore) : BroadcastReceiver() {
             val dump = store.current.dump()
             SLog.i("effective config:\n$dump")
             if (isOrderedBroadcast) {
+                // Each process of the patched app that registered a receiver appends its own block,
+                // so the reply shows every process — including a separate playback process that may
+                // be the one that actually owns the ExoPlayer. The config dump is written once.
+                val prior = resultData
+                val mine = "pid=${android.os.Process.myPid()} process=${processName()}\n${Diag.snapshot()}"
                 resultCode = Activity.RESULT_OK
-                resultData = "pid=${android.os.Process.myPid()} process=${processName()}\n$dump"
+                resultData = if (prior.isNullOrBlank()) "$dump\n\n$mine" else "$prior\n\n$mine"
             }
         } catch (t: Throwable) {
             SLog.e("config receiver failed", t)
