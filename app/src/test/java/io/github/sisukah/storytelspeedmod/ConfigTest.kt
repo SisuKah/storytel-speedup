@@ -129,8 +129,19 @@ class ConfigTest {
 
     @Test
     fun migrationNeverRevivesAnExplicitlyDisabledModule() {
-        val off = mapOf(Keys.MODE to "off")
-        assertEquals(Mode.OFF.key, Config.migrate(off)[Keys.MODE])
+        // every spelling Mode.parse accepts as OFF must survive migration, and the user's own
+        // spelling is preserved rather than rewritten
+        for (raw in listOf("off", "OFF", " off ", "0", "false", "none", "disabled")) {
+            val migrated = Config.migrate(mapOf(Keys.MODE to raw))
+            assertEquals("'$raw' must stay disabled", Mode.OFF, Mode.parse(migrated[Keys.MODE]))
+            assertEquals(Config.CURRENT_VERSION.toString(), migrated[Keys.CONFIG_VERSION])
+        }
+    }
+
+    @Test
+    fun migrationStillUpgradesAnAbsentMode() {
+        val migrated = Config.migrate(mapOf(Keys.TARGET to "4.0"))
+        assertEquals(Mode.LADDER, Mode.parse(migrated[Keys.MODE]))
     }
 
     @Test

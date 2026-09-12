@@ -75,11 +75,30 @@ object SpeedPolicy {
 
     /** One-line human summary of the ladder, for the in-app diagnostics. */
     fun describeLadder(cfg: Config): String {
+        if (cfg.mode != Mode.LADDER) return "(not in use, mode=${cfg.mode.key})"
+        val ceil = ceiling(cfg)
         val base = if (cfg.ladder.isEmpty()) "(empty — no speed will change)"
-        else cfg.ladder.joinToString("  ") { "${fmt(it.from)}->${fmt(capped(it.to, cfg))}" }
+        else cfg.ladder.joinToString("  ") {
+            val out = capped(it.to, cfg)
+            // A rung above the cap is silently truncated, and two rungs can collapse onto the same
+            // speed that way, so say so instead of printing a mapping the user never asked for.
+            if (it.to > ceil + 0.005f) "${fmt(it.from)}->${fmt(out)}(capped from ${fmt(it.to)}; raise max_speed)"
+            else "${fmt(it.from)}->${fmt(out)}"
+        }
         val bad = cfg.ladderConflicts
         return if (bad.isEmpty()) base
         else base + "  [dropped, would map twice: " +
             bad.joinToString(", ") { "${fmt(it.from)}->${fmt(it.to)}" } + "]"
+    }
+
+    /**
+     * True when [v] is a speed this configuration produces, i.e. possibly our own substitution
+     * coming back through the constructor after Media3 rebuilt the parameters. Used to keep the
+     * observed-speeds list showing Storytel's real button values.
+     */
+    fun isOurOutput(v: Float, cfg: Config): Boolean = when (cfg.mode) {
+        Mode.OFF -> false
+        Mode.LADDER -> cfg.ladder.any { approxEqual(v, capped(it.to, cfg)) }
+        Mode.REMAP_2X, Mode.FORCE_TARGET -> approxEqual(v, effectiveTarget(cfg))
     }
 }

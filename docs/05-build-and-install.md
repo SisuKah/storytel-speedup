@@ -87,8 +87,11 @@ Then:
    after seeks, and whether Storytel's UI fights the value (repeated events you did not trigger
    mean Storytel re-applies its own state; the hook maps those too, which is harmless).
 6. Tune the ladder if a rung is too fast, e.g. a gentler mapping:
-   `scripts/config.sh "ladder=1.25:2.0,1.5:2.5,1.75:3.0,2.0:3.5"`. The other modes are still
-   available: `scripts/config.sh "mode=force;target=3.0"`, back with `scripts/config.sh "mode=ladder"`.
+   `scripts/config.sh "ladder=1.25:2.25,1.5:2.5,1.75:2.75,2.0:3.0"`. Keep every output above 2.0:
+   a rung whose output equals another rung's input is refused, because Media3 rebuilds the value
+   and it would be applied twice. The reply prints any refused rung after `effective ladder:`.
+   The other modes are still available: `scripts/config.sh "mode=force;target=3.0"`, back with
+   `scripts/config.sh "mode=ladder"`.
 7. Turn discovery off for daily use: `scripts/config.sh "discovery=false"`.
 
 ## Useful adb one-liners

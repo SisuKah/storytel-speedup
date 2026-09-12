@@ -62,7 +62,7 @@ adb install-multiple patched/*.apk
 adb logcat -s StorytelSpeedMod                      # expect LOADED, "usable : true", "hooked [funnel]"
 # nothing else to configure: pick the speed inside Storytel
 #   1.25 -> 2.5x   1.5 -> 3x   1.75 -> 3.5x   2 -> 4x   (1x and below unchanged)
-scripts/config.sh "ladder=1.25:2.0,1.5:2.5,1.75:3.0,2.0:3.5"   # optional: a gentler mapping
+scripts/config.sh "ladder=1.25:2.25,1.5:2.5,1.75:2.75,2.0:3.0"   # optional: a gentler mapping
 ```
 
 Defaults: `mode=ladder` with `ladder=1.25:2.5,1.5:3.0,1.75:3.5,2.0:4.0`, `max_speed=4.0`,

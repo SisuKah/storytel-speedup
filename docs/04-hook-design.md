@@ -151,6 +151,11 @@ Storytel button   plays at      (default ladder)
 Configured as `ladder=from:to,from:to,...`. Buttons not listed keep their real speed. An explicitly
 empty `ladder=` means no step changes anything (use `mode=off` to disable the module properly).
 
+One rule when inventing a ladder: **no output may equal another rung's input.** Media3 does not keep
+the value handed to it, so our substitution re-enters the same constructor; a rung like `1.25:1.75`
+next to `1.75:2.25` would land on 2.25. Such rungs are refused and named after `effective ladder:`
+in the reply. Keeping every output above Storytel's own 2.0 maximum satisfies this automatically.
+
 ```text
 MODE_REMAP_2X (mode=remap)                   MODE_FORCE_TARGET (mode=force)
 Storytel requests 0.5 … 1.75x  -> unchanged  Storytel requests anything -> target

@@ -22,6 +22,7 @@ import io.github.sisukah.storytelspeedmod.ConfigReceiver
 import io.github.sisukah.storytelspeedmod.HookPoint
 import io.github.sisukah.storytelspeedmod.Keys
 import io.github.sisukah.storytelspeedmod.Mode
+import io.github.sisukah.storytelspeedmod.SpeedPolicy
 
 /**
  * Optional configuration UI. Only needed to CHANGE the mapping: in ladder mode (the default) the
@@ -73,6 +74,7 @@ class ConfigActivity : Activity() {
         root.addView(label("Speed ladder  (Storytel button : speed actually played)"))
         ladderEdit = EditText(this).apply {
             setText(Config.DEFAULT_LADDER)
+            hint = "empty = no button is boosted"
             inputType = InputType.TYPE_CLASS_TEXT
             typeface = Typeface.MONOSPACE
         }
@@ -156,13 +158,20 @@ class ConfigActivity : Activity() {
         }
         val target = customTarget.text.toString().trim().toFloatOrNull()
             ?: TARGETS.getOrElse(targetGroup.checkedRadioButtonId - ID_TARGET_BASE) { 3.0f }
-        val ladder = ladderEdit.text.toString().trim().ifEmpty { Config.DEFAULT_LADDER }
+        // Sent through empty on purpose: Config treats an explicit empty ladder as "no steps",
+        // so clearing the box is how the user turns boosting off without leaving ladder mode.
+        val ladder = ladderEdit.text.toString().trim()
         val kv = buildString {
             append(Keys.MODE).append('=').append(mode.key).append('\n')
             append(Keys.LADDER).append('=').append(ladder).append('\n')
             append(Keys.TARGET).append('=').append(target).append('\n')
             append(Keys.DISCOVERY).append('=').append(discoveryBox.isChecked).append('\n')
             append(Keys.HOOK_POINT).append('=').append(if (ctorBox.isChecked) HookPoint.CTOR.key else HookPoint.PLAYER.key).append('\n')
+            // Raise the cap to fit what was actually typed, so a 5x rung is not silently clamped
+            // to 4x. Written before the Advanced box so an explicit max_speed there still wins.
+            val highestTo = Config.parseLadder(ladder).maxOfOrNull { it.to } ?: 0f
+            val cap = minOf(SpeedPolicy.MEDIA3_MAX_SPEED, maxOf(4.0f, highestTo, target))
+            append(Keys.MAX_SPEED).append('=').append(cap).append('\n')
             append(advancedEdit.text.toString())
         }
         save()
@@ -190,6 +199,7 @@ class ConfigActivity : Activity() {
 
     private fun save() {
         prefs.edit()
+            .putInt("ui_version", UI_PREFS_VERSION)
             .putString("pkg", pkgEdit.text.toString())
             .putInt("mode", modeGroup.checkedRadioButtonId)
             .putString("ladder", ladderEdit.text.toString())
@@ -203,7 +213,11 @@ class ConfigActivity : Activity() {
 
     private fun restore() {
         pkgEdit.setText(prefs.getString("pkg", DEFAULT_PACKAGE))
-        modeGroup.check(prefs.getInt("mode", ID_MODE_LADDER))
+        // Preferences survive an APK upgrade, and this app's older build saved a mode id whose
+        // value now means "Remap". Restoring it would preselect the legacy mode and the next Apply
+        // would push the user back off the ladder, so a pre-ladder selection is discarded.
+        val freshPrefs = prefs.getInt("ui_version", 1) >= UI_PREFS_VERSION
+        modeGroup.check(if (freshPrefs) prefs.getInt("mode", ID_MODE_LADDER) else ID_MODE_LADDER)
         ladderEdit.setText(prefs.getString("ladder", Config.DEFAULT_LADDER))
         targetGroup.check(prefs.getInt("target", ID_TARGET_BASE + 1))
         customTarget.setText(prefs.getString("custom", ""))
@@ -228,6 +242,9 @@ class ConfigActivity : Activity() {
 
     private companion object {
         const val DEFAULT_PACKAGE = "grit.storytel.app"
+
+        /** Bumped when a stored UI selection would mean something different in this build. */
+        const val UI_PREFS_VERSION = 2
         val TARGETS = listOf(2.5f, 3.0f, 3.5f, 4.0f)
 
         /**

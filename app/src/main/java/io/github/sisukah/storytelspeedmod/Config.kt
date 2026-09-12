@@ -277,8 +277,9 @@ class Config(private val values: Map<String, String>) {
             val version = stored[Keys.CONFIG_VERSION]?.trim()?.toIntOrNull() ?: 1
             if (version >= CURRENT_VERSION) return stored
             val out = LinkedHashMap(stored)
-            val storedMode = stored[Keys.MODE]?.trim()?.lowercase()
-            if (storedMode != Mode.OFF.key) {
+            // Parse rather than string-compare: "0", "false", "none" and "disabled" all mean OFF,
+            // and a module the user deliberately disabled must never be switched back on.
+            if (Mode.parse(stored[Keys.MODE]) != Mode.OFF) {
                 out[Keys.MODE] = Mode.LADDER.key
             }
             out[Keys.CONFIG_VERSION] = CURRENT_VERSION.toString()

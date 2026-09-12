@@ -89,6 +89,38 @@ class SpeedPolicyTest {
     }
 
     @Test
+    fun ourOwnOutputIsRecognisedSoItIsNotMistakenForAButton() {
+        // Media3 rebuilds the parameters we substituted, so 4.0 comes back through the ctor
+        val c = Config.defaults()
+        assertTrue(SpeedPolicy.isOurOutput(4.0f, c))
+        assertTrue(SpeedPolicy.isOurOutput(2.5f, c))
+        assertFalse("a real button value is not our output", SpeedPolicy.isOurOutput(2.0f, c))
+        assertFalse(SpeedPolicy.isOurOutput(1.0f, c))
+    }
+
+    @Test
+    fun ourOwnOutputCoversRemapAndForceAndNeverFiresWhenOff() {
+        assertTrue(SpeedPolicy.isOurOutput(3.5f, cfg(Keys.MODE to "remap", Keys.TARGET to "3.5")))
+        assertTrue(SpeedPolicy.isOurOutput(3.0f, cfg(Keys.MODE to "force", Keys.TARGET to "3.0")))
+        assertFalse(SpeedPolicy.isOurOutput(3.0f, cfg(Keys.MODE to "off", Keys.TARGET to "3.0")))
+    }
+
+    @Test
+    fun describeLadderFlagsRungsTruncatedByTheCap() {
+        val c = cfg(Keys.LADDER to "1.5:3.0,2.0:6.0", Keys.MAX_SPEED to "4.0")
+        val text = SpeedPolicy.describeLadder(c)
+        assertTrue(text, text.contains("capped from 6.00"))
+        assertFalse("an in-range rung must not be flagged", text.contains("1.50->3.00(capped"))
+    }
+
+    @Test
+    fun describeLadderSaysWhenTheLadderIsNotInUse() {
+        val text = SpeedPolicy.describeLadder(cfg(Keys.MODE to "remap"))
+        assertTrue(text, text.contains("not in use"))
+        assertTrue(text, text.contains("remap"))
+    }
+
+    @Test
     fun describeLadderListsEveryStep() {
         val text = SpeedPolicy.describeLadder(Config.defaults())
         assertTrue(text, text.contains("1.25->2.50"))
