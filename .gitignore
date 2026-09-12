@@ -1,0 +1,23 @@
+# Gradle / Android Studio
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Never commit APKs pulled from the phone or patched output.
+storytel-apk/
+patched/
+*.apk
+*.apks
+*.apkm
+*.xapk
+!docs/**/*.png
+
+# Keystores
+*.jks
+*.keystore

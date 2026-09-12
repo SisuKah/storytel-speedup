@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.DeviceDefault.Light">
+
+        <!-- Optional configuration UI. Only usable when this APK is ALSO installed as a normal
+             app on the phone. It talks to the hook code inside Storytel via a broadcast; the
+             same thing can be done from adb (see docs/05-build-and-install.md). -->
+        <activity
+            android:name=".ui.ConfigActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Classic Xposed module metadata (read by LSPatch and LSPosed). -->
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription" android:value="@string/xposed_description" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <!-- Modern LSPosed metadata: recommended scope (ignored by LSPatch, harmless). -->
+        <meta-data android:name="xposedscope" android:resource="@array/xposedscope" />
+    </application>
+</manifest>

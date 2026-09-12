@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Recommended scope for LSPosed. Confirm the package with:
+         adb shell pm list packages | grep -i storytel -->
+    <string-array name="xposedscope">
+        <item>grit.storytel.app</item>
+    </string-array>
+</resources>

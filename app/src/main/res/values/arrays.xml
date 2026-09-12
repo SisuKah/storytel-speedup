@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Recommended scope for LSPosed. Under LSPatch the module is embedded into Storytel
+         directly, so this list is informational. -->
+    <string-array name="xposedscope">
+        <item>grit.storytel.app</item>
+    </string-array>
+</resources>

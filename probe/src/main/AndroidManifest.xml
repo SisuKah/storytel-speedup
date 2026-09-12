@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- No activities, no permissions, no receivers. This APK is only a container for the
+         hook class + Xposed metadata. -->
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name">
+
+        <!-- Classic Xposed module metadata (read by LSPatch and LSPosed). -->
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription" android:value="@string/xposed_description" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <!-- Modern LSPosed metadata: recommended scope (ignored by LSPatch, harmless). -->
+        <meta-data android:name="xposedscope" android:resource="@array/xposedscope" />
+    </application>
+</manifest>
