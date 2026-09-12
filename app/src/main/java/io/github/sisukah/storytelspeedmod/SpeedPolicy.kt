@@ -2,13 +2,15 @@ package io.github.sisukah.storytelspeedmod
 
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.min
 
 /**
  * Pure decision logic (no Android, no Xposed) so it can be unit tested on the JVM.
  *
- *   MODE_REMAP_2X  : incoming == remap_from  ->  target ; everything else untouched
- *   MODE_FORCE_TARGET : any incoming          ->  target
- *   OFF            : nothing changes (discovery still logs)
+ *   LADDER (default) : each of Storytel's own buttons maps to a faster speed
+ *   REMAP_2X         : only `remap_from` (2.0) becomes `target`
+ *   FORCE_TARGET     : any speed becomes `target`
+ *   OFF              : nothing changes (discovery still logs)
  */
 object SpeedPolicy {
 
@@ -18,11 +20,14 @@ object SpeedPolicy {
 
     data class Decision(val speed: Float, val changed: Boolean, val reason: String)
 
-    /** The configured target, clamped to [0.1, max_speed] where max_speed itself is <= 8.0. */
-    fun effectiveTarget(cfg: Config): Float {
-        val cap = cfg.maxSpeed.coerceIn(MEDIA3_MIN_SPEED, MEDIA3_MAX_SPEED)
-        return cfg.target.coerceIn(MEDIA3_MIN_SPEED, cap)
-    }
+    /** Upper bound actually allowed: the configured cap, never above Media3's own limit. */
+    fun ceiling(cfg: Config): Float = min(cfg.maxSpeed, MEDIA3_MAX_SPEED).coerceAtLeast(MEDIA3_MIN_SPEED)
+
+    /** Clamps a requested output speed into the allowed range. */
+    fun capped(value: Float, cfg: Config): Float = value.coerceIn(MEDIA3_MIN_SPEED, ceiling(cfg))
+
+    /** The configured target, clamped. Used by REMAP_2X and FORCE_TARGET. */
+    fun effectiveTarget(cfg: Config): Float = capped(cfg.target, cfg)
 
     fun decide(incoming: Float, cfg: Config, callerMatches: Boolean = true): Decision {
         if (incoming.isNaN() || incoming.isInfinite() || incoming <= 0f) {
@@ -31,20 +36,50 @@ object SpeedPolicy {
         if (!callerMatches) {
             return Decision(incoming, false, "caller filter not matched, untouched")
         }
-        val target = effectiveTarget(cfg)
         return when (cfg.mode) {
             Mode.OFF -> Decision(incoming, false, "mode=off")
-            Mode.REMAP_2X ->
+
+            Mode.LADDER -> {
+                val step = cfg.ladder.firstOrNull { approxEqual(incoming, it.from) }
+                if (step == null) {
+                    Decision(incoming, false, "passthrough (${fmt(incoming)} is not a ladder step)")
+                } else {
+                    val out = capped(step.to, cfg)
+                    Decision(out, !approxEqual(out, incoming), "ladder ${fmt(step.from)} -> ${fmt(out)}")
+                }
+            }
+
+            Mode.REMAP_2X -> {
                 if (approxEqual(incoming, cfg.remapFrom)) {
-                    Decision(target, !approxEqual(target, incoming), "remap ${fmt(cfg.remapFrom)} -> ${fmt(target)}")
+                    val out = effectiveTarget(cfg)
+                    Decision(out, !approxEqual(out, incoming), "remap ${fmt(cfg.remapFrom)} -> ${fmt(out)}")
                 } else {
                     Decision(incoming, false, "passthrough (not ${fmt(cfg.remapFrom)})")
                 }
-            Mode.FORCE_TARGET -> Decision(target, !approxEqual(target, incoming), "force -> ${fmt(target)}")
+            }
+
+            Mode.FORCE_TARGET -> {
+                val out = effectiveTarget(cfg)
+                Decision(out, !approxEqual(out, incoming), "force -> ${fmt(out)}")
+            }
         }
     }
 
+    /**
+     * Storytel's steps are 0.25 apart, so the tolerance must stay well below that. It also has to
+     * absorb float noise from parsing and from any percentage-based UI maths.
+     */
     fun approxEqual(a: Float, b: Float): Boolean = abs(a - b) < 0.005f
 
     fun fmt(f: Float): String = String.format(Locale.ROOT, "%.2f", f)
+
+    /** One-line human summary of the ladder, for the in-app diagnostics. */
+    fun describeLadder(cfg: Config): String {
+        val base = if (cfg.ladder.isEmpty()) "(empty — no speed will change)"
+        else cfg.ladder.joinToString("  ") { "${fmt(it.from)}->${fmt(capped(it.to, cfg))}" }
+        val bad = cfg.ladderConflicts
+        return if (bad.isEmpty()) base
+        else base + "  [dropped, would map twice: " +
+            bad.joinToString(", ") { "${fmt(it.from)}->${fmt(it.to)}" } + "]"
+    }
 }

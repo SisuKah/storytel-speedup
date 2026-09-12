@@ -134,8 +134,25 @@ the process starts: change them, then `adb shell am force-stop grit.storytel.app
 
 ### Modes
 
+**`mode=ladder` (default).** Each of Storytel's own buttons maps to a faster effective speed, so the
+speed is chosen inside Storytel and applies the instant the button is tapped. This is the mode that
+removes the external app and the app restart from the loop: a speed only changes when Storytel
+builds a new `PlaybackParameters`, which is exactly what tapping a button does.
+
 ```text
-MODE_REMAP_2X (mode=remap, default)          MODE_FORCE_TARGET (mode=force)
+Storytel button   plays at      (default ladder)
+0.5 / 0.75 / 1.0  unchanged     normal listening still works
+1.25              2.5x
+1.5               3.0x
+1.75              3.5x
+2.0               4.0x
+```
+
+Configured as `ladder=from:to,from:to,...`. Buttons not listed keep their real speed. An explicitly
+empty `ladder=` means no step changes anything (use `mode=off` to disable the module properly).
+
+```text
+MODE_REMAP_2X (mode=remap)                   MODE_FORCE_TARGET (mode=force)
 Storytel requests 0.5 … 1.75x  -> unchanged  Storytel requests anything -> target
 Storytel requests 2.0x         -> target     (Storytel's whole picker becomes "target")
 ```
@@ -147,7 +164,8 @@ into the fast option). `mode=off` keeps hooks and logging but changes nothing.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `mode` | `remap` | `off` / `remap` / `force` |
+| `mode` | `ladder` | `ladder` / `remap` / `force` / `off` |
+| `ladder` | `1.25:2.5,1.5:3.0,1.75:3.5,2.0:4.0` | ladder mode only: `button:played` pairs |
 | `target` | `3.0` | presets 2.5, 3.0, 3.5, 4.0 or any value; clamped to `[0.1, max_speed]` |
 | `remap_from` | `2.0` | the requested speed that becomes `target` in remap mode |
 | `max_speed` | `4.0` | safety cap (Media3's own hard cap is 8.0) |

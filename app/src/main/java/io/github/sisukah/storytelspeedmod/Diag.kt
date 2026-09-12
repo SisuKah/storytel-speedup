@@ -24,6 +24,8 @@ object Diag {
     private const val MAX_INFO = 6
     private val events = ArrayDeque<String>()
     private val infos = ArrayDeque<String>()
+    /** Distinct speeds Storytel asked for: the real button values, for tuning the ladder. */
+    private val observed = sortedSetOf<Float>()
     private val clock = SimpleDateFormat("HH:mm:ss", Locale.ROOT)
 
     @Synchronized
@@ -39,10 +41,17 @@ object Diag {
         while (infos.size > MAX_INFO) infos.removeFirst()
     }
 
+    /** Records a speed Storytel requested (before substitution). */
+    @Synchronized
+    fun observe(speed: Float) {
+        if (speed.isFinite() && speed > 0f && observed.size < 40) observed.add(speed)
+    }
+
     @Synchronized
     fun clear() {
         events.clear()
         infos.clear()
+        observed.clear()
     }
 
     /** Compact block appended to every broadcast reply. [maxEvents] most recent events are shown. */
@@ -51,9 +60,13 @@ object Diag {
         append("--- diagnostics ---\n")
         append(resolution).append('\n')
         infos.forEach { append(it).append('\n') }
+        if (observed.isNotEmpty()) {
+            append("speeds Storytel asked for: ")
+            append(observed.joinToString(" ") { SpeedPolicy.fmt(it) }).append('\n')
+        }
         append("speed events: ").append(events.size)
         if (events.isEmpty()) {
-            append("\n(none yet. Start a book, change the speed to 2x, then press Show current. ")
+            append("\n(none yet. Start a book, tap a speed button, then press Show current. ")
             append("If this still says 0, Storytel is not reaching the hooked player.)")
         } else {
             events.toList().takeLast(maxEvents).forEach { append('\n').append(it) }

@@ -65,32 +65,30 @@ Then:
    Expect `LOADED: package=grit.storytel.app …`, then `effective config:`, then the
    `Media3 target resolution:` block ending in `usable : true`, then `hooked [funnel] …`.
 3. Test normal playback exactly as in Phase 1 (play, seek, pause, notification controls, lock screen).
-   With defaults (`mode=remap`, `target=3.0`) the app already behaves as: 0.5–1.75x unchanged,
-   2x → 3x.
+   With defaults (`mode=ladder`) the app already behaves as: 0.5/0.75/1x unchanged,
+   1.25 → 2.5x, 1.5 → 3x, 1.75 → 3.5x, 2 → 4x — all chosen inside Storytel.
 4. Enable discovery and confirm the path:
 
    ```bash
    scripts/config.sh "discovery=true"       # or: adb shell am broadcast -a io.github.sisukah.storytelspeedmod.CONFIG -p grit.storytel.app --es set "'discovery=true'"
    ```
 
-   Change speed 1x → 1.5x → 2x in Storytel. Each tap must produce a `[SET]` block; the 2x tap must
-   show `in=2.00x … -> out=3.00x (remap 2.00 -> 3.00 …)`. Listen: it should audibly be faster than 2x.
-5. Test 2x remapping at each preset, one at a time, listening for at least a chapter:
+   Change speed in Storytel. Each tap produces an event; on an obfuscated build it is a `[CTOR]`
+   line, on a clean build a `[SET]` line. Either way `in=` is the button you tapped and `out=` is
+   what Media3 receives.
+5. Test each rung, one at a time, listening for at least a few minutes:
 
-   ```bash
-   scripts/config.sh "target=2.5"     # tap 2x in Storytel (or tap another speed, then 2x, to re-trigger)
-   scripts/config.sh "target=3.0"
-   scripts/config.sh "target=3.5"
-   scripts/config.sh "target=4.0"
-   ```
+   In ladder mode there is nothing to set: tap 1.25x, then 1.5x, 1.75x and 2x in Storytel and
+   listen. They should play at 2.5x, 3x, 3.5x and 4x. The diagnostics reply lists each one as a
+   `[CTOR] ... in=1.50x -> out=3.00x (ladder ...)` event.
 
-   Because the funnel ignores unchanged values, re-select 2x (via another speed) after changing
-   the target so the new value is applied. Watch for: stutter/underruns (CPU), position jumps
-   after seeks, and whether Storytel's UI fights the value (repeated `[SET] in=2.00x` lines without
-   you tapping = Storytel re-applying; the hook remaps them again, which is harmless but tells you
-   Storytel syncs speed from its own state).
-6. Optional force mode: `scripts/config.sh "mode=force;target=3.0"` makes every picker entry 3x.
-   Return with `scripts/config.sh "mode=remap"`.
+   A speed only changes when Storytel builds a new value, so after editing the ladder, tap a
+   different speed and then the one you want. Watch for: stutter/underruns (CPU), position jumps
+   after seeks, and whether Storytel's UI fights the value (repeated events you did not trigger
+   mean Storytel re-applies its own state; the hook maps those too, which is harmless).
+6. Tune the ladder if a rung is too fast, e.g. a gentler mapping:
+   `scripts/config.sh "ladder=1.25:2.0,1.5:2.5,1.75:3.0,2.0:3.5"`. The other modes are still
+   available: `scripts/config.sh "mode=force;target=3.0"`, back with `scripts/config.sh "mode=ladder"`.
 7. Turn discovery off for daily use: `scripts/config.sh "discovery=false"`.
 
 ## Useful adb one-liners

@@ -174,6 +174,7 @@ object Media3Hooks {
         val cfg = store.current
         val inSpeed = (param.args[0] as? Float) ?: return
         val pitch = (param.args[1] as? Float) ?: 1f
+        Diag.observe(inSpeed)
         val wantLog = cfg.discovery && cfg.discoveryCtor
         // The ctor substitutes when explicitly selected (hook_point=ctor) OR automatically when no
         // player-level entry point was resolved (the obfuscated-Media3 path).

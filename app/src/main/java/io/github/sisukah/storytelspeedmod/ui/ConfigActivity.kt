@@ -17,22 +17,24 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import io.github.sisukah.storytelspeedmod.Config
 import io.github.sisukah.storytelspeedmod.ConfigReceiver
 import io.github.sisukah.storytelspeedmod.HookPoint
 import io.github.sisukah.storytelspeedmod.Keys
 import io.github.sisukah.storytelspeedmod.Mode
 
 /**
- * Optional, dependency-free configuration UI. Only available when this module APK is ALSO
- * installed as a normal app. It does not store the config itself: it sends the same CONFIG
- * broadcast that adb can send, and shows the reply from the hook running inside Storytel.
+ * Optional configuration UI. Only needed to CHANGE the mapping: in ladder mode (the default) the
+ * speeds are picked in Storytel itself, so day to day this app is not opened at all.
  *
- * Storytel (patched) must be running for the broadcast to be answered.
+ * It stores nothing: it sends the same CONFIG broadcast adb can send, and shows the reply from the
+ * hook running inside Storytel. Storytel (patched) must be running.
  */
 class ConfigActivity : Activity() {
 
     private lateinit var pkgEdit: EditText
     private lateinit var modeGroup: RadioGroup
+    private lateinit var ladderEdit: EditText
     private lateinit var targetGroup: RadioGroup
     private lateinit var customTarget: EditText
     private lateinit var discoveryBox: CheckBox
@@ -55,51 +57,82 @@ class ConfigActivity : Activity() {
             setPadding(pad, pad, pad, pad)
         }
 
-        root.addView(label("Target package (patched Storytel)"))
-        pkgEdit = EditText(this).apply { setText(DEFAULT_PACKAGE); inputType = InputType.TYPE_CLASS_TEXT }
-        root.addView(pkgEdit)
+        root.addView(note(
+            "Ladder mode (default): pick the speed inside Storytel. Its four fastest buttons play " +
+                "faster than they say. Changes apply the moment you tap a speed in Storytel — no restart."))
 
         root.addView(label("Mode"))
         modeGroup = RadioGroup(this)
-        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_REMAP; text = "Remap 2x -> target (default, safest)" })
-        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_FORCE; text = "Force target for every speed request" })
-        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_OFF; text = "Off (hooks only log)" })
-        modeGroup.check(ID_MODE_REMAP)
+        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_LADDER; text = "Ladder — Storytel's buttons become fast speeds (recommended)" })
+        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_REMAP; text = "Remap only 2x to one target speed" })
+        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_FORCE; text = "Force one target speed for everything" })
+        modeGroup.addView(RadioButton(this).apply { id = ID_MODE_OFF; text = "Off (no speed is changed)" })
+        modeGroup.check(ID_MODE_LADDER)
         root.addView(modeGroup)
 
-        root.addView(label("Target speed"))
+        root.addView(label("Speed ladder  (Storytel button : speed actually played)"))
+        ladderEdit = EditText(this).apply {
+            setText(Config.DEFAULT_LADDER)
+            inputType = InputType.TYPE_CLASS_TEXT
+            typeface = Typeface.MONOSPACE
+        }
+        root.addView(ladderEdit)
+
+        val presets = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        PRESETS.forEach { (name, spec) ->
+            presets.addView(Button(this).apply {
+                text = name
+                setOnClickListener { ladderEdit.setText(spec); modeGroup.check(ID_MODE_LADDER) }
+            })
+        }
+        root.addView(presets)
+        root.addView(note(
+            "Untouched buttons keep their real speed, so 1x stays 1x. Storytel's own display still " +
+                "shows the button value, so \"time left\" will read high while a boosted step plays."))
+
+        root.addView(label("Target speed  (used by Remap and Force only)"))
         targetGroup = RadioGroup(this).apply { orientation = LinearLayout.HORIZONTAL }
-        PRESETS.forEachIndexed { i, v ->
+        TARGETS.forEachIndexed { i, v ->
             targetGroup.addView(RadioButton(this).apply { id = ID_TARGET_BASE + i; text = "${v}x" })
         }
-        targetGroup.check(ID_TARGET_BASE + 1) // 3.0x
+        targetGroup.check(ID_TARGET_BASE + 1)
         root.addView(targetGroup)
         customTarget = EditText(this).apply {
-            hint = "custom target, e.g. 2.75 (overrides presets when filled)"
+            hint = "custom target, e.g. 2.75 (overrides the presets when filled)"
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
         root.addView(customTarget)
 
         root.addView(label("Discovery / debug"))
-        discoveryBox = CheckBox(this).apply { text = "Discovery mode (log every speed change to logcat, tag StorytelSpeedMod)" }
+        discoveryBox = CheckBox(this).apply { text = "Discovery mode (verbose logcat under tag StorytelSpeedMod)" }
         root.addView(discoveryBox)
-        ctorBox = CheckBox(this).apply { text = "Use constructor hook point instead of player funnel (fallback)" }
+        ctorBox = CheckBox(this).apply { text = "Force the constructor hook point" }
         root.addView(ctorBox)
 
-        root.addView(label("Advanced (one key=value per line, see docs)"))
+        root.addView(label("Advanced (one key=value per line)"))
         advancedEdit = EditText(this).apply {
-            hint = "remap_from=2.0\ncaller_filter=\ncls_playback_parameters=\nui_speed_list_class="
+            hint = "max_speed=4.0\ncaller_filter=\ncls_playback_parameters="
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            minLines = 3
+            minLines = 2
             typeface = Typeface.MONOSPACE
         }
         root.addView(advancedEdit)
 
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(Button(this).apply { text = "Apply"; setOnClickListener { apply() } })
-        buttons.addView(Button(this).apply { text = "Show current"; setOnClickListener { send(Bundle().apply { putBoolean(ConfigReceiver.EXTRA_SHOW, true) }) } })
-        buttons.addView(Button(this).apply { text = "Reset"; setOnClickListener { send(Bundle().apply { putBoolean(ConfigReceiver.EXTRA_RESET, true) }) } })
+        buttons.addView(Button(this).apply {
+            text = "Show current"
+            setOnClickListener { send(Bundle().apply { putBoolean(ConfigReceiver.EXTRA_SHOW, true) }) }
+        })
+        buttons.addView(Button(this).apply {
+            text = "Reset"
+            setOnClickListener { send(Bundle().apply { putBoolean(ConfigReceiver.EXTRA_RESET, true) }) }
+        })
         root.addView(buttons)
+
+        root.addView(label("Target package (patched Storytel)"))
+        pkgEdit = EditText(this).apply { setText(DEFAULT_PACKAGE); inputType = InputType.TYPE_CLASS_TEXT }
+        root.addView(pkgEdit)
 
         root.addView(label("Reply from Storytel process"))
         output = TextView(this).apply {
@@ -116,14 +149,17 @@ class ConfigActivity : Activity() {
 
     private fun apply() {
         val mode = when (modeGroup.checkedRadioButtonId) {
+            ID_MODE_REMAP -> Mode.REMAP_2X
             ID_MODE_FORCE -> Mode.FORCE_TARGET
             ID_MODE_OFF -> Mode.OFF
-            else -> Mode.REMAP_2X
+            else -> Mode.LADDER
         }
         val target = customTarget.text.toString().trim().toFloatOrNull()
-            ?: PRESETS.getOrElse(targetGroup.checkedRadioButtonId - ID_TARGET_BASE) { 3.0f }
+            ?: TARGETS.getOrElse(targetGroup.checkedRadioButtonId - ID_TARGET_BASE) { 3.0f }
+        val ladder = ladderEdit.text.toString().trim().ifEmpty { Config.DEFAULT_LADDER }
         val kv = buildString {
             append(Keys.MODE).append('=').append(mode.key).append('\n')
+            append(Keys.LADDER).append('=').append(ladder).append('\n')
             append(Keys.TARGET).append('=').append(target).append('\n')
             append(Keys.DISCOVERY).append('=').append(discoveryBox.isChecked).append('\n')
             append(Keys.HOOK_POINT).append('=').append(if (ctorBox.isChecked) HookPoint.CTOR.key else HookPoint.PLAYER.key).append('\n')
@@ -145,8 +181,8 @@ class ConfigActivity : Activity() {
                 } else {
                     "No reply from $pkg.\n\nChecklist:\n" +
                         "- Is the PATCHED Storytel installed and currently running (open it, start playback)?\n" +
-                        "- Did the module load? adb logcat -s StorytelSpeedMod should show a LOADED line.\n" +
-                        "- Is the package name right? adb shell pm list packages | grep -i storytel"
+                        "- Did the module load? The reply starts with a pid line when it did.\n" +
+                        "- Is the package name right?"
                 }
             }
         }, null, Activity.RESULT_CANCELED, null, null)
@@ -156,6 +192,7 @@ class ConfigActivity : Activity() {
         prefs.edit()
             .putString("pkg", pkgEdit.text.toString())
             .putInt("mode", modeGroup.checkedRadioButtonId)
+            .putString("ladder", ladderEdit.text.toString())
             .putInt("target", targetGroup.checkedRadioButtonId)
             .putString("custom", customTarget.text.toString())
             .putBoolean("discovery", discoveryBox.isChecked)
@@ -166,7 +203,8 @@ class ConfigActivity : Activity() {
 
     private fun restore() {
         pkgEdit.setText(prefs.getString("pkg", DEFAULT_PACKAGE))
-        modeGroup.check(prefs.getInt("mode", ID_MODE_REMAP))
+        modeGroup.check(prefs.getInt("mode", ID_MODE_LADDER))
+        ladderEdit.setText(prefs.getString("ladder", Config.DEFAULT_LADDER))
         targetGroup.check(prefs.getInt("target", ID_TARGET_BASE + 1))
         customTarget.setText(prefs.getString("custom", ""))
         discoveryBox.isChecked = prefs.getBoolean("discovery", false)
@@ -180,11 +218,30 @@ class ConfigActivity : Activity() {
         setPadding(0, dp(12), 0, dp(4))
     }
 
+    private fun note(text: String): TextView = TextView(this).apply {
+        this.text = text
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        setPadding(0, dp(4), 0, dp(4))
+    }
+
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     private companion object {
         const val DEFAULT_PACKAGE = "grit.storytel.app"
-        val PRESETS = listOf(2.5f, 3.0f, 3.5f, 4.0f)
+        val TARGETS = listOf(2.5f, 3.0f, 3.5f, 4.0f)
+
+        /**
+         * One-tap ladders, gentle to fastest. Every output is above Storytel's own 2.0 maximum on
+         * purpose: an output equal to a button value would be mapped a second time when Media3
+         * rebuilds the parameters (see Config.parseLadder), so such rungs are refused.
+         */
+        val PRESETS = listOf(
+            "Gentle" to "1.75:2.25,2.0:2.5",
+            "Medium" to "1.25:2.25,1.5:2.5,1.75:2.75,2.0:3.0",
+            "Fast" to Config.DEFAULT_LADDER,
+        )
+
+        const val ID_MODE_LADDER = 1000
         const val ID_MODE_REMAP = 1001
         const val ID_MODE_FORCE = 1002
         const val ID_MODE_OFF = 1003

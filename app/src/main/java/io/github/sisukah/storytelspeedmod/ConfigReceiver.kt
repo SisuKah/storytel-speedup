@@ -43,7 +43,9 @@ class ConfigReceiver(private val store: ConfigStore) : BroadcastReceiver() {
                 // so the reply shows every process — including a separate playback process that may
                 // be the one that actually owns the ExoPlayer. The config dump is written once.
                 val prior = resultData
-                val mine = "pid=${android.os.Process.myPid()} process=${processName()}\n${Diag.snapshot()}"
+                val ladder = "effective ladder: " + SpeedPolicy.describeLadder(store.current)
+                val mine = "pid=${android.os.Process.myPid()} process=${processName()}\n" +
+                    "$ladder\n${Diag.snapshot()}"
                 resultCode = Activity.RESULT_OK
                 resultData = if (prior.isNullOrBlank()) "$dump\n\n$mine" else "$prior\n\n$mine"
             }

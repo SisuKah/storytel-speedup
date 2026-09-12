@@ -7,6 +7,10 @@ Media3/ExoPlayer playback speed inside the app process. Personal use on your own
 It does **not** touch DRM, audio data, downloads, or network traffic. It changes one number
 (`PlaybackParameters.speed`) on its way into ExoPlayer, and keeps pitch correction as-is.
 
+By default it runs in **ladder mode**: Storytel's four fastest buttons play faster than they say
+(1.25 -> 2.5x, 1.5 -> 3x, 1.75 -> 3.5x, 2 -> 4x), so every high speed is one tap away inside
+Storytel itself. Nothing to open, nothing to restart. 1x and below are untouched.
+
 ## Working order (do not skip ahead)
 
 | Step | Guide | Deliverable in this repo |
@@ -56,12 +60,13 @@ renamed Media3 class names if R8 obfuscated them; Storytel's speed list source a
 java -jar lspatch.jar -o patched -f -l <level> -m app/build/outputs/apk/release/app-release.apk storytel-apk/*.apk
 adb install-multiple patched/*.apk
 adb logcat -s StorytelSpeedMod                      # expect LOADED, "usable : true", "hooked [funnel]"
-scripts/config.sh "discovery=true"                  # then change speed 1x -> 1.5x -> 2x in Storytel
-scripts/config.sh "target=3.5"                      # 2x button now plays 3.5x (mode=remap is the default)
+# nothing else to configure: pick the speed inside Storytel
+#   1.25 -> 2.5x   1.5 -> 3x   1.75 -> 3.5x   2 -> 4x   (1x and below unchanged)
+scripts/config.sh "ladder=1.25:2.0,1.5:2.5,1.75:3.0,2.0:3.5"   # optional: a gentler mapping
 ```
 
-Defaults: `mode=remap` (Storytel's 2x becomes the target, 0.5–1.75x untouched), `target=3.0`,
-`max_speed=4.0`, `hook_point=player`, `discovery=false`.
+Defaults: `mode=ladder` with `ladder=1.25:2.5,1.5:3.0,1.75:3.5,2.0:4.0`, `max_speed=4.0`,
+`hook_point=player`, `discovery=false`. The other modes (`remap`, `force`, `off`) are still there.
 
 ## Risks, in one paragraph
 
